@@ -20,6 +20,53 @@
 #define RELAY_2 GPIO_NUM_1
 #define RELAY_3 GPIO_NUM_0
 
+/*
+  The control commands to parse are 4 bytes messages in the input stream:
+  1. 0xA0 fix value command prefix
+  2. 0x01 relay number [ 1, 2, 3]
+  3. 0x00 = off, 0x01 = on
+  4. sum of first 3 bytes as simple checksum
+
+  NB: byte value A0 is no valid second, third or fourth byte,
+      so A0 is first message byte in any case! 
+
+  First implementation:
+  * read message by message 
+  * check for errors and handle errors by error/warning messages
+  * call handle_message(relay_num, on_off) just if no errors found
+  while true:
+    read a byte c
+    if c is not 0xA0:
+        log warning "read invalid message prefix %x", c
+    else:
+        read 3 bytes as relay_num, on_of, message_checksum
+        if message_checksum is not valid:
+            log error "invalid message checksum! Ignoring message"
+        else if relay_num is not valid:
+            log error "invalid relay_num %d! Ignoring message", relay_num
+        else if on_off is not valid:
+            log warning "invalid on_of %d for relay_num = %d", on_off, relay_num
+	else
+            call handle_message(relay_num, on_off)
+
+  Future extensions:
+  * allow to control a fourth relay 
+    (trivial implementation)
+  * allow to control multiple relays in one comman
+    (relay 255 = 0xFF as virtual "all relays")
+  * as security feature set a timeout to switch of all relays,
+       when no command is received for a specified time
+       (message: 0xA0 0xFE ms4 checksum, with ms4=0: no timeout,
+        ms4>0: timeout after 4 milli seconds * ms4)
+
+   Future implementation:
+   // use relay_number -> gpio_num gpio table
+   gpio_num_t relay_gpio_map = [0, GPIO_NUM_10, GPIO_NUM_1, GPIO_NUM_0]
+   #define MIN_RELAY 1
+   #define MAX_RELAY (sizeof(relay_gpio_map)-MIN_RELAY)
+*/
+
+
 // initialize by board_attributes:
 uint16_t board_id = 0; // 16 bit network device address 
 
@@ -51,7 +98,7 @@ static void relay_task(void* arg) {
         if (c != EOF) {
             LOGI(TAG, "read %d", c);
 
-            if (prev == 0x41 && current == 0x30) {
+            if (c == 0xA0) {
                 handle_command();
             }
 
