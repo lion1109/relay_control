@@ -86,54 +86,70 @@ void fatal_error(const char* error) {
     while (1) vTaskDelay(pdMS_TO_TICKS(10000));
 }
 
+int my_getchar() {
+    uint8_t c;
+
+    while (true) {
+        int len = usb_serial_jtag_read_bytes(&c, 1, pdMS_TO_TICKS(100));
+
+        if (len == 1) {
+            LOGI(TAG, "read 0x%02X", c);
+            return c;
+        }
+    }
+}
+
 static void relay_task(void* arg) {
     LOGI(TAG, "relay_control task started");
 
-    uint8_t prev = 0;
-    // uint8_t current;
-
     while (true) {
-        /*int c = getchar();
+        int c = my_getchar();
         
-        if (c != EOF) {
-            LOGI(TAG, "read %d", c);
+        if (c == EOF) {
+            LOGI(TAG, "read EOF");
+            return;
+        }
 
-            if (c == 0xA0) {
-                handle_command();
-            }
+        if (c != 0xA0){
+            LOGW(TAG, "read %x, expected was first byte A0", c);
+            continue;
+        }
 
-            prev = current;
-        }'*/
+        int relay_num = my_getchar();
 
-        gpio_set_level(RELAY_1, 0);
-        gpio_set_level(RELAY_2, 0);
-        gpio_set_level(RELAY_3, 0);
+        if (relay_num < 1 || relay_num > 3){
+            LOGE(TAG, "illegal relay_num: %d", relay_num);
+            continue;
+        }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        int on_off = my_getchar();
 
-        gpio_set_level(RELAY_1, 1);
-        gpio_set_level(RELAY_2, 1);
-        gpio_set_level(RELAY_3, 1);
+        if ( on_off < 0 || on_off > 1 ) {
+            LOGE(TAG, "illegal on_off: %d", on_off);
+            continue;
+        }
+        
+        int check_sum = my_getchar();
+        uint8_t expected_sum = (uint8_t)(0xA0 + relay_num + on_off);
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        if(check_sum != expected_sum){
+            LOGE(TAG, "illegal check_sum: %x, expected was: %x", check_sum, expected_sum);
+            continue;
+        }
+        
+        if(relay_num == 1){
+            gpio_set_level(RELAY_1, on_off ? 0 : 1); //on = 0 off= 1
+        }
 
-        gpio_set_level(RELAY_1, 0);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        gpio_set_level(RELAY_1, 1);
+         if(relay_num == 2){
+            gpio_set_level(RELAY_2, on_off ? 0 : 1); //on = 0 off= 1
+        }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+         if(relay_num == 3){
+            gpio_set_level(RELAY_3, on_off ? 0 : 1); //on = 0 off= 1
+        }
 
-        gpio_set_level(RELAY_2, 0);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        gpio_set_level(RELAY_2, 1);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-        gpio_set_level(RELAY_3, 0);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        gpio_set_level(RELAY_3, 1);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        LOGI(TAG, "switched relay %d to %s", relay_num, on_off ? "on" : "off");
     }
 
     fatal_error("relay_control task end");
@@ -164,7 +180,7 @@ extern "C" void app_main() {
         .rx_buffer_size = 256,
     };
     usb_serial_jtag_driver_install(&config);
-
+   
     // create tasks
     xTaskCreatePinnedToCore(
       relay_task,      // Funktion für UWB-Empfang
