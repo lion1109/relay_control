@@ -1,5 +1,5 @@
 idf_component_register(
-	SRCS "relay_control.cpp"
+	SRCS "relay_control.c"
 	INCLUDE_DIRS "."
         REQUIRES build driver esp_wifi esp_http_server
 )

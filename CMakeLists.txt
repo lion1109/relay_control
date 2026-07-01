@@ -7,6 +7,10 @@ endif()
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(relay_control)
 
+if(DEFINED UNIT_TEST)
+    set(EXTRA_COMPONENT_DIRS test)
+endif()
+
 #set(EXTRA_COMPONENT_DIRS components/dw3000)
 
 #if(UNIT_TEST)

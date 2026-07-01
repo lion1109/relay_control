@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ESP-IDF Build",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "source ~/esp/esp-idf/export.sh && idf.py build"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
