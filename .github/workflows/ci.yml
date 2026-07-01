@@ -19,6 +19,6 @@ jobs:
         run: |
           . /opt/esp/idf/export.sh
           cd .
-          idf.py set-target esp32
+          idf.py set-target esp32c3
           idf.py build
 
