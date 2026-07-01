@@ -5,6 +5,8 @@
 #include <driver/uart.h>
 #include <driver/gpio.h>
 #include <driver/usb_serial_jtag.h>
+#include <nvs_flash.h>
+#include <nvs.h>
 
 #include <string.h>
 #include <math.h>
@@ -145,11 +147,48 @@ int usb_serial_getchar() {
 }
 
 
+#define NVS_NAMESPACE "relay"
+#define NVS_KEY_ACTIVE_LEVEL "active_level"
+
+static void load_gpio_active_level(void)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
+
+    if (err == ESP_OK) {
+        int32_t level = 1; // default
+
+        err = nvs_get_i32(handle, NVS_KEY_ACTIVE_LEVEL, &level);
+        if (err == ESP_OK) {
+            gpio_active_level = (int)level;
+        }
+
+        nvs_close(handle);
+    }
+
+    LOGI(TAG, "loaded gpio_active_level=%d", gpio_active_level);
+}
+
+static void save_gpio_active_level(int level)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+
+    if (err == ESP_OK) {
+        nvs_set_i32(handle, NVS_KEY_ACTIVE_LEVEL, level);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+
+    LOGI(TAG, "saved gpio_active_level=%d", level);
+}
+
 void set_relay_active_level(int level) { // level might be 0 or 1
     // todo: store gpio_active_level in nva
-    if (level == 0 || level == 1)
+    if (level == 0 || level == 1) {
         gpio_active_level = level;
-    else
+        save_gpio_active_level(level);
+    } else
         LOGE(TAG, "illegal gpio_active_level %d", level);
 }
 
@@ -225,12 +264,20 @@ static void relay_task(void* arg) {
 
 
 STATIC void init_relays(void) {
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
     // future: read configuration from nvs:
     // gpio_active_level, min_relay_num, max_relay_num, relay_gpio_map
 
     current_state = 0; // initialize by no relay active
 
-    set_relay_active_level(1); // initialize gpio_active_level
+    load_gpio_active_level();
+    // set_relay_active_level(1); // initialize gpio_active_level
 
     for (uint8_t relay_num = min_relay_num; relay_num <= max_relay_num; relay_num++) {
         gpio_num_t gpio_num = relay_gpio_map[relay_num - min_relay_num];
