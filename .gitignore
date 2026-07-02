@@ -2,4 +2,4 @@ build
 build_test
 sdkconfig
 sdkconfig.old
-
+.vscode/settings.json
