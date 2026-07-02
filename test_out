@@ -1,0 +1,11 @@
+#!/bin/bash
+
+port=/dev/ttyACM0
+
+stty -F $port raw -echo
+
+while true
+   do cat - < $port
+   sleep 1
+   echo "restart output of $port"
+done
